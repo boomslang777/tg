@@ -48,10 +48,11 @@ def get_exp(contract_name):
             month = nearest_day_date.strftime('%m').lstrip('0')  # Remove leading zero for month
             return nearest_day_date.strftime('%y{0}%d').format(month) + nearest_day_date.strftime('%y%m%d')[6:]
 
-def place_order(instrument, qty,kite):
+async def place_order(instrument, qty,kite,bot):
     print(instrument)
+    mark = get_ltp(kite,instrument)
     if qty >0 and qty < 900 :
-        kite.place_order(variety=kite.VARIETY_REGULAR, exchange="NFO",
+        order_id = kite.place_order(variety=kite.VARIETY_REGULAR, exchange="NFO",
                         tradingsymbol=instrument,
                         transaction_type="BUY",
                         quantity=qty,
@@ -61,22 +62,37 @@ def place_order(instrument, qty,kite):
                         price=0,
                         trigger_price=0)
         print("Position entered successfully")
+        message = f"Position entered successfully {instrument} at {mark} Rs. with order id {order_id}"
+        entity = await bot.get_entity(1002140069507)  # Replace 'your_channel_username' with your channel's username
+        print(entity.id)
+        group_id = entity.id
+
+        # Now use the obtained group_id in the send_message call
+        await bot.send_message(group_id, message)
     else :
         legs = qty//900
         if qty%900 != 0 :
             legs += 1
-        kite.place_order(variety=kite.VARIETY_ICEBERG,exchange = "NFO"
+        order_id = kite.place_order(variety=kite.VARIETY_ICEBERG,exchange = "NFO"
                          ,tradingsymbol=instrument,transaction_type = 'BUY',quantity=qty,
                          order_type="MARKET",product="MIS",validity="DAY",
                          iceberg_legs = legs,price =0,trigger_price =0,iceberg_quantity=900)
+        print("Position entered successfully")
+        message = f"Position entered successfully {tradingsymbol} with order id {order_id}"
+        entity = await bot.get_entity(1002140069507)  # Replace 'your_channel_username' with your channel's username
+        print(entity.id)
+        group_id = entity.id
+
+        # Now use the obtained group_id in the send_message call
+        await bot.send_message(group_id, message)
 
 
-def place_sl_order(instrument, qty,kite):
+async def place_sl_order(instrument, qty,kite,bot):
     print(instrument)
     mark_price = kite.ltp(f"NFO:{instrument}")[f"NFO:{instrument}"]["last_price"]
     print(instrument)
     if qty >0 and qty< 900 :
-        kite.place_order(variety=kite.VARIETY_REGULAR, exchange="NFO",
+        order_id = kite.place_order(variety=kite.VARIETY_REGULAR, exchange="NFO",
                         tradingsymbol=instrument,
                         transaction_type="SELL",
                         quantity=qty,
@@ -86,6 +102,13 @@ def place_sl_order(instrument, qty,kite):
                         price=mark_price -80,
                         trigger_price=mark_price - 75)
         print("SL placed successfully")   
+        message = f"SL entered successfully {instrument} at {mark_price-80} with order id {order_id}"
+        entity = await bot.get_entity(1002140069507)  # Replace 'your_channel_username' with your channel's username
+        print(entity.id)
+        group_id = entity.id
+
+        # Now use the obtained group_id in the send_message call
+        await bot.send_message(group_id, message)
     else :
         legs = qty//900
         if qty%900 != 0 :
@@ -95,6 +118,13 @@ def place_sl_order(instrument, qty,kite):
                          ,tradingsymbol=instrument,transaction_type = 'SELL',quantity=qty,
                          order_type="SL",product="MIS",validity="DAY",
                          iceberg_legs = legs,price =mark_price-80,trigger_price =mark_price-75,iceberg_quantity  = iceberg_qty)
+        message = f"SL entered successfully {instrument} with order id {order_id}"
+        entity = await bot.get_entity(1002140069507)  # Replace 'your_channel_username' with your channel's username
+        print(entity.id)
+        group_id = entity.id
+
+        # Now use the obtained group_id in the send_message call
+        await bot.send_message(group_id, message)
              
 
 def place_iceberg_limit_order(kite, tradingsymbol, quantity, price):
@@ -264,7 +294,13 @@ async def square_off_all_positions(kite,bot):
                                             tag="SquareOff")
 
                 # Print information about the square off order
-                print(f"Square off order placed for {tradingsymbol} with order id {order_id}")
+                message = f"Square off order placed for {tradingsymbol} with order id {order_id}"
+                entity = await bot.get_entity(1002140069507)  # Replace 'your_channel_username' with your channel's username
+                print(entity.id)
+                group_id = entity.id
+
+                # Now use the obtained group_id in the send_message call
+                await bot.send_message(group_id, message)
             else :
                 legs = quantity//900
                 # remaining_qty = quantity % 900
@@ -334,6 +370,36 @@ async def square_off_all_positions(kite,bot):
 
 
 
+async def calculate_and_send_pnl(kite, group_id, bot):
+    while True:
+        try:
+            positions = kite.positions()['net']
+            orders = kite.orders()
+
+            for position in positions:
+                trading_symbol = position['tradingsymbol']
+                quantity = position['quantity']
+
+                # Check if there is an open position
+                has_open_position = quantity != 0
+
+                # Check if the SL order is hit
+                
+
+                if has_open_position :
+                    pnl = position['pnl']
+                    print(f"PnL for {trading_symbol}: ", pnl)
+                    await bot.send_message(group_id, f"PnL for {trading_symbol}: {pnl}")
+                else:
+                    print("No open positions")
+                    break
+
+            await asyncio.sleep(60)  # Adjust the sleep duration as needed
+
+        except Exception as e:
+            print(f"An error occurred while calculating P&L: {e}")
+            # Add appropriate error handling logic here
+
 async def fire(condition, kite, bot):
     try:
         if condition == 1 or condition == -1:
@@ -344,13 +410,14 @@ async def fire(condition, kite, bot):
             contract_name = "BANKNIFTY"
             order_info = f"{contract_name}{exp}{stk}{option_type}"
             ltp = get_ltp(kite, order_info)
-            quantity = 15 # Set the desired quantity (you need to define the quantity here)
+            quantity = 15  # Set the desired quantity (you need to define the quantity here)
             margin = quantity * ltp
             message = f"Direction: {direction}\nOrder Info: {order_info}\nQuantity: {quantity}\nLTP : {ltp}\nDo you want to proceed? (Type /yes to confirm),\n{margin} is margin"
             entity = await bot.get_entity(1002140069507)  # Replace 'your_channel_username' with your channel's username
             print(entity.id)
             group_id = entity.id
             print(f"{order_info} is order info")
+            
             # Now use the obtained group_id in the send_message call
             await bot.send_message(group_id, message)
 
@@ -373,10 +440,13 @@ async def fire(condition, kite, bot):
                     order_info = f"{contract_name}{exp}{stkm}{option_type}"
                     print(f"Market Order - Quantity: {quantity}, Strike: {stkm}")
                     print("Placing trades")
-                    await place_order(order_info, quantity, kite)
+                    await place_order(order_info, quantity, kite,bot)
                     print("Order placed")
                     await place_sl_order(order_info, quantity, kite)
                     print("SL placed")
+
+                    # Integrate P&L streaming
+                    await calculate_and_send_pnl(kite, group_id, bot)
 
                 elif match_limit_order:
                     price = float(match_limit_order.group(1))
@@ -390,28 +460,30 @@ async def fire(condition, kite, bot):
                     order = kite.order_history(order_id)
                     status = order['status']
                     print("Order Status: ", status)
-                    while True :
-                            orders = kite.orders()
-                            open_orders = [order for order in orders if order['status'] == 'OPEN']
-                            if not open_orders:
-                                print("No open orders found.")
-                                print("Placing SL")
-                                place_sl_order(order_info,quantity,kite)
-                                break
-                                
-                            else:
-                                # Get the latest open order
-                                latest_order = open_orders[-1]
-                                time.sleep(1)
-                                continue
-                                            # Add your logic for limit order here
+                    while True:
+                        orders = kite.orders()
+                        open_orders = [order for order in orders if order['status'] == 'OPEN']
+                        if not open_orders:
+                            print("No open orders found.")
+                            print("Placing SL")
+                            place_sl_order(order_info, quantity, kite)
+                            break
+                        else:
+                            # Get the latest open order
+                            latest_order = open_orders[-1]
+                            time.sleep(1)
+                            continue
+                            # Add your logic for limit order here
 
                 elif event.message.text == '/yes':
                     print("Placing trades")
-                    place_order(order_info, quantity, kite)
+                    await place_order(order_info, quantity, kite,bot)
                     print("Order placed")
-                    place_sl_order(order_info, quantity, kite)
+                    await place_sl_order(order_info, quantity, kite,bot)
                     print("SL placed")
+
+                    # Integrate P&L streaming
+                    await calculate_and_send_pnl(kite, group_id, bot)
 
             await bot.run_until_disconnected()
 
