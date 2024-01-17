@@ -87,5 +87,14 @@ def square_off_all_positions():
 
             #     # Now use the obtained group_id in the send_message call
             #     await bot.send_message(group_id, message)      
+def cancel_orders():
+    orders = kite.orders()
+    for order in orders:
+        if order["status"] == "OPEN" and order["pending_quantity"] > 0:
+            order_id = order["order_id"]
+            print(order_id)
+            kite.cancel_order(kite.VARIETY_REGULAR, order_id)
+            print(f"Order {order_id} cancelled")
                 
 square_off_all_positions()                
+cancel_orders()
