@@ -23,30 +23,35 @@ def get_exp(contract_name):
         else:
             days_until_nearest_day = (2 - day_of_week + 7) % 7  # 2 corresponds to Wednesday
 
-        if (current_date + timedelta(days=days_until_nearest_day)).month != (current_date + timedelta(days=7)).month:
-            # Last week of the month, return in the format "YYMON" for Thursday
-            return current_date.strftime('%y%b').upper()
+        nearest_day_date = current_date + timedelta(days=days_until_nearest_day)
+        next_week_date = current_date + timedelta(days=7)
+
+        # Check if the selected expiry is the last week of the month
+        if nearest_day_date.month != next_week_date.month or (nearest_day_date.day + 7) > next_week_date.day:
+            # If it is, return in the format "YYMON"
+            return nearest_day_date.strftime('%y%b').upper()
         else:
             # Regular case
-            nearest_day_date = current_date + timedelta(days=days_until_nearest_day)
             month = nearest_day_date.strftime('%m').lstrip('0')  # Remove leading zero for month
             return nearest_day_date.strftime('%y{0}%d').format(month) + nearest_day_date.strftime('%y%m%d')[6:]
 
-    elif contract_name == "NIFTY":
-        current_date = datetime.now()
-        day_of_week = current_date.weekday()
+
+
+    # elif contract_name == "NIFTY":
+    #     current_date = datetime.now()
+    #     day_of_week = current_date.weekday()
         
-        # Calculate days until Thursday
-        days_until_thursday = (3 - day_of_week + 7) % 7
-        nearest_thursday_date = current_date + timedelta(days=days_until_thursday)
+    #     # Calculate days until Thursday
+    #     days_until_thursday = (3 - day_of_week + 7) % 7
+    #     nearest_thursday_date = current_date + timedelta(days=days_until_thursday)
 
-        if nearest_thursday_date.month != (nearest_thursday_date + timedelta(days=7)).month:
-            # Last week of the month, return in the format "YYMON"
-            return nearest_thursday_date.strftime('%y%b')
-        else:
-            nearest_day_date = current_date + timedelta(days=days_until_nearest_day)
-            month = nearest_day_date.strftime('%m').lstrip('0')  # Remove leading zero for month
-            return nearest_day_date.strftime('%y{0}%d').format(month) + nearest_day_date.strftime('%y%m%d')[6:]
+    #     if nearest_thursday_date.month != (nearest_thursday_date + timedelta(days=7)).month:
+    #         # Last week of the month, return in the format "YYMON"
+    #         return nearest_thursday_date.strftime('%y%b')
+    #     else:
+    #         nearest_day_date = current_date + timedelta(days=days_until_nearest_day)
+    #         month = nearest_day_date.strftime('%m').lstrip('0')  # Remove leading zero for month
+    #         return nearest_day_date.strftime('%y{0}%d').format(month) + nearest_day_date.strftime('%y%m%d')[6:]
 
 async def place_order(instrument, qty,kite,bot):
     print(instrument)
@@ -78,7 +83,7 @@ async def place_order(instrument, qty,kite,bot):
                          order_type="MARKET",product="MIS",validity="DAY",
                          iceberg_legs = legs,price =0,trigger_price =0,iceberg_quantity=900)
         print("Position entered successfully")
-        message = f"Position entered successfully {tradingsymbol} with order id {order_id}"
+        message = f"Position entered successfully {instrument} with order id {order_id}"
         entity = await bot.get_entity(1002140069507)  # Replace 'your_channel_username' with your channel's username
         print(entity.id)
         group_id = entity.id
@@ -127,7 +132,7 @@ async def place_sl_order(instrument, qty,kite,bot):
         await bot.send_message(group_id, message)
              
 
-def place_iceberg_limit_order(kite, tradingsymbol, quantity, price):
+async def place_iceberg_limit_order(kite, tradingsymbol, quantity, price,bot):
     """
     Place an iceberg order.
 
@@ -141,7 +146,7 @@ def place_iceberg_limit_order(kite, tradingsymbol, quantity, price):
     mark = get_ltp(kite,tradingsymbol)
     # Calculate the number of legs
     if quantity >0 and quantity < 900 :
-        kite.place_order(variety=kite.VARIETY_REGULAR, exchange="NFO",
+        order_id = kite.place_order(variety=kite.VARIETY_REGULAR, exchange="NFO",
                         tradingsymbol=tradingsymbol,
                         transaction_type="BUY",
                         quantity=quantity,
@@ -150,6 +155,20 @@ def place_iceberg_limit_order(kite, tradingsymbol, quantity, price):
                         validity="DAY",
                         price=mark)
         print("Position entered successfully")
+        orders = kite.orders()
+        print(orders)
+        for order in orders:
+            if order["status"] == "OPEN" and order["pending_quantity"] > 0 and order["order_id"] == order_id :
+                print("Order not filled")
+            else :
+                message = f"Order filled with {order_id} for {tradingsymbol} at {mark} Rs."
+                entity = await bot.get_entity(1002140069507)  # Replace 'your_channel_username' with your channel's username
+                print(entity.id)
+                group_id = entity.id
+
+        # Now use the obtained group_id in the send_message call
+                await bot.send_message(group_id, message)
+
     else : 
         legs = quantity // 900
         if quantity % 900 != 0:
@@ -176,7 +195,7 @@ def place_iceberg_limit_order(kite, tradingsymbol, quantity, price):
             print(f"An error occurred while placing the order: {e}")
 
 
-def ctc(kite):
+async def ctc(kite,bot):
     positions = kite.positions()['net']
 
 # Fetch the orders
@@ -202,7 +221,7 @@ def ctc(kite):
 
         # Modify the order
         try:
-            kite.modify_order(
+            order_id = kite.modify_order(
                 order_id=latest_order['order_id'],
                 parent_order_id=latest_order['parent_order_id'],
                 order_type=latest_order['order_type'],
@@ -212,39 +231,46 @@ def ctc(kite):
                 disclosed_quantity=latest_order['disclosed_quantity']
             )
             print(f"Order {latest_order['order_id']} modified successfully.")
+            message = f"SL moved to Cost {average_price}, with order ID {order_id}"
+            entity = await bot.get_entity(1002140069507)  # Replace 'your_channel_username' with your channel's username
+            print(entity.id)
+            group_id = entity.id
+
+            # Now use the obtained group_id in the send_message call
+            await bot.send_message(group_id, message)
         except Exception as e:
             print(f"An error occurred while modifying order {latest_order['order_id']}: {e}")
 
-def move_sl(kite):
-    # Fetch current positions
-    positions = kite.positions()
+# def move_sl(kite):
+#     # Fetch current positions
+#     positions = kite.positions()
 
-    # Iterate through each position type ('net', 'day')
-    for position_type in ['net']:
-        # Iterate through positions of the current type
-        for position in positions.get(position_type, []):
-            # Extract relevant information
-            tradingsymbol = position['tradingsymbol']
-            quantity = position['quantity']
-            average_price = position['average_price']  # Entry price
+#     # Iterate through each position type ('net', 'day')
+#     for position_type in ['net']:
+#         # Iterate through positions of the current type
+#         for position in positions.get(position_type, []):
+#             # Extract relevant information
+#             tradingsymbol = position['tradingsymbol']
+#             quantity = position['quantity']
+#             average_price = position['average_price']  # Entry price
 
-            if quantity > 0:
-                # Place a stop loss order at the entry price
-                sl_order_id = kite.place_order(variety=kite.VARIETY_REGULAR,
-                                               exchange=kite.EXCHANGE_NFO,
-                                               tradingsymbol=tradingsymbol,
-                                               transaction_type=kite.TRANSACTION_TYPE_SELL,
-                                               quantity=quantity,
-                                               product=kite.PRODUCT_MIS,
-                                               order_type=kite.ORDER_TYPE_SL,
-                                               trigger_price=average_price+10,
-                                               price = average_price,
-                                               tag="StopLoss")
+#             if quantity > 0 and quantity<900:
+#                 # Place a stop loss order at the entry price
+#                 sl_order_id = kite.place_order(variety=kite.VARIETY_REGULAR,
+#                                                exchange=kite.EXCHANGE_NFO,
+#                                                tradingsymbol=tradingsymbol,
+#                                                transaction_type=kite.TRANSACTION_TYPE_SELL,
+#                                                quantity=quantity,
+#                                                product=kite.PRODUCT_MIS,
+#                                                order_type=kite.ORDER_TYPE_SL,
+#                                                trigger_price=average_price+10,
+#                                                price = average_price,
+#                                                tag="StopLoss")
 
-                # Print information about the stop loss order
-                print(f"Stop loss order placed at entry price for {tradingsymbol} with order id {sl_order_id}")
-            else:
-                print("No position to place stop loss")
+#                 # Print information about the stop loss order
+#                 print(f"Stop loss order placed at entry price for {tradingsymbol} with order id {sl_order_id}")
+#             else:
+#                 print("No position to place stop loss")
     
     
 def get_stk(condition,kite):
@@ -255,9 +281,9 @@ def get_stk(condition,kite):
     print(f"{strike_price} is strike price")
 
     if condition == "BUY":
-        return strike_price + 100
+        return strike_price + 900
     elif condition == "SELL":
-        return strike_price - 100
+        return strike_price - 900
     else:
         return strike_price
 
