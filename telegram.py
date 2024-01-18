@@ -76,16 +76,12 @@ async def trade(signal):
 async def handle_new_message(event):
     sender = await event.get_sender()
     content = event.message.text
-    if content == '\SQOFF' :
+    if content == '/EXT' :
+        print("positions squaring off")
         await security.square_off_all_positions(kite,bot)
-    elif content == '\CTC' :
-        security.move_sl(kite)
-        orders = kite.orders()
-        print(orders)
-        for order in orders:
-            if order["status"] == "OPEN" and order["pending_quantity"] > 0 :
-                order_id = order["order_id"]
-                modify = kite.modify_order()
+    elif content == '/CTC' :
+        print("Cost to cost")
+        await security.ctc(kite,bot)
     # Call the regex_parser function with the message content
     await regex_parser(content)
 
