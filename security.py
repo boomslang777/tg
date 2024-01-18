@@ -399,6 +399,8 @@ async def square_off_all_positions(kite,bot):
 async def calculate_and_send_pnl(kite, group_id, bot):
     while True:
         try:
+            pos = kite.positions()
+            print(pos)
             positions = kite.positions()['net']
             orders = kite.orders()
 
@@ -413,7 +415,7 @@ async def calculate_and_send_pnl(kite, group_id, bot):
                 
 
                 if has_open_position :
-                    pnl = position['pnl']
+                    pnl = position['m2m']
                     print(f"PnL for {trading_symbol}: ", pnl)
                     await bot.send_message(group_id, f"PnL for {trading_symbol}: {pnl}")
                 else:
@@ -468,7 +470,7 @@ async def fire(condition, kite, bot):
                     print("Placing trades")
                     await place_order(order_info, quantity, kite,bot)
                     print("Order placed")
-                    await place_sl_order(order_info, quantity, kite)
+                    await place_sl_order(order_info, quantity, kite,bot)
                     print("SL placed")
 
                     # Integrate P&L streaming
@@ -492,7 +494,7 @@ async def fire(condition, kite, bot):
                         if not open_orders:
                             print("No open orders found.")
                             print("Placing SL")
-                            place_sl_order(order_info, quantity, kite)
+                            place_sl_order(order_info, quantity, kite,bot)
                             break
                         else:
                             # Get the latest open order
