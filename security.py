@@ -150,7 +150,7 @@ async def place_iceberg_limit_order(kite, tradingsymbol, quantity, price,bot):
                         tradingsymbol=tradingsymbol,
                         transaction_type="BUY",
                         quantity=quantity,
-                        order_type="LMT",
+                        order_type="LIMIT",
                         product="MIS",
                         validity="DAY",
                         price=mark)
@@ -291,7 +291,7 @@ def cancel_orders(kite):
     orders = kite.orders()
     print(orders)
     for order in orders:
-        if order["status"] == "OPEN" and order["pending_quantity"] > 0:
+        if order["status"] == "OPEN" or order["status"] == "TRIGGER PENDING" and order["pending_quantity"] > 0:
             order_id = order["order_id"]
             print(order_id)
             kite.cancel_order(kite.VARIETY_REGULAR, order_id)
@@ -299,6 +299,7 @@ def cancel_orders(kite):
 
 
 async def square_off_all_positions(kite,bot):
+    cancel_orders(kite)
     # Fetch current positions
     positions =  kite.positions()
     # Iterate through each position type ('net', 'day')
@@ -310,7 +311,7 @@ async def square_off_all_positions(kite,bot):
             quantity = position['quantity']
             if quantity > 0 and quantity < 900:
                 # Place a market sell order to square off the position
-                order_id = await kite.place_order(variety=kite.VARIETY_REGULAR,
+                order_id =  kite.place_order(variety=kite.VARIETY_REGULAR,
                                             exchange=kite.EXCHANGE_NFO,
                                             tradingsymbol=tradingsymbol,
                                             transaction_type=kite.TRANSACTION_TYPE_SELL,
@@ -422,7 +423,7 @@ async def calculate_and_send_pnl(kite, group_id, bot):
                     print("No open positions")
                     break
 
-            await asyncio.sleep(60)  # Adjust the sleep duration as needed
+            await asyncio.sleep(60*5)  # Adjust the sleep duration as needed
 
         except Exception as e:
             print(f"An error occurred while calculating P&L: {e}")
@@ -484,7 +485,7 @@ async def fire(condition, kite, bot):
                     stkl = int(round(banknifty_ltp + strike, -2))
                     order_info = f"{contract_name}{exp}{stkl}{option_type}"
                     print(f"Limit Order - Price: {price}, Quantity: {quantity}, Strike: {strike}")
-                    order_id = await place_iceberg_limit_order(kite, order_info, quantity, price)
+                    order_id = await place_iceberg_limit_order(kite, order_info, quantity, price,bot)
                     order = kite.order_history(order_id)
                     status = order['status']
                     print("Order Status: ", status)
