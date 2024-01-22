@@ -1,108 +1,66 @@
-from telethon import TelegramClient, events
-import re
-text = """Symbol : NSE:BANKNIFTY1!
-Time : 2024-01-11 14:15:01 
+from ib_insync import IB, MarketOrder, OrderCondition, Order, Option
 
-Alert - Breakdown Detected 
-NSE:BANKNIFTY1! price has closed below the marked low level of 47603.05
+def place_orders(form_data, ib):
+    instrument = form_data['instrument']
+    strike = form_data['strike']
+    expiry = form_data['expiry']
+    lots = form_data['lots']
+    incremental_lots = form_data['incremental_lots']
+    SL = form_data['SL']
+    TP = form_data['TP']
 
-PCA-L $ 193.05 / PTM-HL $ 276.5 / BCS $ 308
+    # Create the option contract
+    option = Option('BANKNIFTY', expiry, strike, 'C', 'NSE')
 
- 
-OFA DATA
+    # Qualify the contract
+    ib.qualifyContracts(option)
 
-BUYERS in action.
-DATE :: 2024-01-11 14:00:00
+    # Request market data
+    market_data = ib.reqMktData(option)
 
-DELTA                161
-===================
-MAX_DELTA       182
-MIN_DELTA       -46
-===================4.0%
-COT_HIGH          12
-COT_LOW           3
-===================0.25%
-$VOLUME$         11.6K
-OI                         2.4M
-===================
-    
+    # Assuming you have a function to get the freeze quantity
+    freeze_quantity = get_freeze_quantity(instrument)
 
- -Powered by BOT Office Assistant - Kate"""
+    # Order slicing based on freeze quantity
+    while lots > 0:
+        if lots > freeze_quantity:
+            # Place order for freeze quantity
+            order = MarketOrder('BUY', freeze_quantity)
+            ib.placeOrder(option, order)
+            lots -= freeze_quantity
+        else:
+            # Place order for remaining lots
+            order = MarketOrder('BUY', lots)
+            ib.placeOrder(option, order)
+            lots = 0
 
-# Define the regular expression pattern
+    # If SL and TP are given, place bracket orders
+    if SL and TP:
+        # Create the parent bracket order
+        parent = LimitOrder('BUY', lots, price)
+        parent.transmit = False
 
-# api_id = '25042394'
-# api_hash = '8ee0191890aad20ce78034468178db27'
-# bot_token = '6785415766:AAGUoJpWVn-8aJIIpgRF_wovRRSL8XDufes'
+        # Create the take profit order
+        takeProfit = LimitOrder('SELL', lots, TP)
+        takeProfit.parentId = parent.orderId
+        takeProfit.transmit = False
 
-# bot = TelegramClient('bot', api_id, api_hash).start(bot_token=bot_token)
+        # Create the stop loss order
+        stopLoss = StopOrder('SELL', lots, SL)
+        stopLoss.parentId = parent.orderId
+        stopLoss.transmit = True
 
-# @bot.on(events.NewMessage(chats=(1002140069507,)))
-# async def handle_new_message(event):
-#     sender = await event.get_sender()
-#     print(f'Username: {sender.username}, Message: {event.message.text}')
-
-# def main():
-#     bot.run_until_disconnected()
-
-# if __name__ == '__main__':
-#     main()
-
-def regex_parser():
-    pattern = re.compile(r'Alert - (Breakout Detected|Breakdown Detected|Stop Loss hit)')
-
-# Search for the pattern in the text
-    match = pattern.search(text)
-
-    # Extract the matched action
-    if match:
-        action = match.group(1)
-        trade(action)
-        print(action)
+        # Place the bracket order
+        for o in [parent, takeProfit, stopLoss]:
+            ib.placeOrder(option, o)
     else:
-        print("No match found.")
+        # Else, hit market order
+        order = MarketOrder('BUY', lots)
+        ib.placeOrder(option, order)
 
-
-import security
-
-
-def trade(signal):
-    print(f"{signal} is signal")
-    import configparser
-    import pyotp
-    from jugaad_trader import Zerodha
-
-    # Read credentials from config file
-    config = configparser.ConfigParser()
-    config.read('creds.ini')
-    user_id = config['DEFAULT']['user_id']
-    password = config['DEFAULT']['password']
-    totp_secret = config['DEFAULT']['totp_secret']
-
-    # Initialize TOTP with the secret key
-    otp_gen = pyotp.TOTP(totp_secret)
-
-    # Generate current OTP
-    current_otp = otp_gen.now()
-
-    # Initialize Zerodha class with credentials and OTP
-    kite = Zerodha(user_id=user_id, password=password, twofa=current_otp)
-
-    # Login to Zerodha
-    login_response = kite.login()
-    print(login_response)
-    margins = kite.margins()
-    print(margins)
-    ltp = kite.ltp("NSE:POLYCAB")
-    print(ltp)
-    if signal == "Stop Loss hit":
-        security.cancel_orders(kite)
-        security.square_off_all_positions(kite)
-    elif signal == "Breakdown Detected":
-        signal = -1
-        security.fire(signal,kite)
-    elif signal == "Breakout Detected":
-        signal = 1
-        security.fire(signal,kite)
-
-regex_parser()    
+    # Incremental lot size functionality
+    while incremental_lots > 0:
+        # Place order for incremental lot size
+        order = MarketOrder('BUY', incremental_lots)
+        ib.placeOrder(option, order)
+        incremental_lots -= 1
