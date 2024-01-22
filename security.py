@@ -67,7 +67,10 @@ async def place_order(instrument, qty,kite,bot):
                         price=0,
                         trigger_price=0)
         print("Position entered successfully")
-        message = f"Position entered successfully {instrument} at {mark} Rs. with order id {order_id}"
+        #message = f"Position entered successfully {instrument} at {mark} Rs. with order id {order_id}"
+        current_time = datetime.now()
+        message = f'exchange_order_id": "{order_id}\nexchange_timestamp": "{current_time}\n Message: status": "COMPLETE"\n{instrument}\nfilled_quantity": {qty}\naverage_price": {mark}\n'
+
         entity = await bot.get_entity(1002140069507)  # Replace 'your_channel_username' with your channel's username
         print(entity.id)
         group_id = entity.id
@@ -107,7 +110,7 @@ async def place_sl_order(instrument, qty,kite,bot):
                         price=mark_price -80,
                         trigger_price=mark_price - 75)
         print("SL placed successfully")   
-        message = f"SL entered successfully {instrument} at {mark_price-80} with order id {order_id}"
+        message = f"SL entered successfully {instrument} at {mark_price-80} \nwith order id {order_id} \nfor {qty} quantity"
         entity = await bot.get_entity(1002140069507)  # Replace 'your_channel_username' with your channel's username
         print(entity.id)
         group_id = entity.id
@@ -146,12 +149,12 @@ async def place_iceberg_limit_order(kite, tradingsymbol, quantity, price,bot):
     mark = get_ltp(kite,tradingsymbol)
     # Calculate the number of legs
     if quantity >0 and quantity < 900 :
-        order_id = kite.place_order(variety=kite.VARIETY_REGULAR, exchange="NFO",
+        order_id = kite.place_order(variety=kite.VARIETY_AMO, exchange="NFO",
                         tradingsymbol=tradingsymbol,
                         transaction_type="BUY",
                         quantity=quantity,
                         order_type="LIMIT",
-                        product="MIS",
+                        product="NRML",
                         validity="DAY",
                         price=mark)
         print("Position entered successfully")
@@ -161,13 +164,16 @@ async def place_iceberg_limit_order(kite, tradingsymbol, quantity, price,bot):
             if order["status"] == "OPEN" and order["pending_quantity"] > 0 and order["order_id"] == order_id :
                 print("Order not filled")
             else :
-                message = f"Order filled with {order_id} for {tradingsymbol} at {mark} Rs."
+                current_time = datetime.now()
+                message = f'exchange_order_id": "{order_id}\nexchange_timestamp": "{current_time}\n Message: status": "COMPLETE"\n{tradingsymbol}\nfilled_quantity": {quantity}\naverage_price": {mark}\n'
+                #message = f"Order filled with {order_id} for {tradingsymbol} at {mark} Rs."
                 entity = await bot.get_entity(1002140069507)  # Replace 'your_channel_username' with your channel's username
                 print(entity.id)
                 group_id = entity.id
 
         # Now use the obtained group_id in the send_message call
                 await bot.send_message(group_id, message)
+            time.sleep(60)
 
     else : 
         legs = quantity // 900
