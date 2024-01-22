@@ -35,24 +35,6 @@ def get_exp(contract_name):
             month = nearest_day_date.strftime('%m').lstrip('0')  # Remove leading zero for month
             return nearest_day_date.strftime('%y{0}%d').format(month) + nearest_day_date.strftime('%y%m%d')[6:]
 
-
-
-    # elif contract_name == "NIFTY":
-    #     current_date = datetime.now()
-    #     day_of_week = current_date.weekday()
-        
-    #     # Calculate days until Thursday
-    #     days_until_thursday = (3 - day_of_week + 7) % 7
-    #     nearest_thursday_date = current_date + timedelta(days=days_until_thursday)
-
-    #     if nearest_thursday_date.month != (nearest_thursday_date + timedelta(days=7)).month:
-    #         # Last week of the month, return in the format "YYMON"
-    #         return nearest_thursday_date.strftime('%y%b')
-    #     else:
-    #         nearest_day_date = current_date + timedelta(days=days_until_nearest_day)
-    #         month = nearest_day_date.strftime('%m').lstrip('0')  # Remove leading zero for month
-    #         return nearest_day_date.strftime('%y{0}%d').format(month) + nearest_day_date.strftime('%y%m%d')[6:]
-
 async def place_order(instrument, qty,kite,bot):
     print(instrument)
     mark = get_ltp(kite,instrument)
@@ -257,37 +239,7 @@ async def ctc(kite,bot):
         except Exception as e:
             print(f"An error occurred while modifying order {latest_order['order_id']}: {e}")
 
-# def move_sl(kite):
-#     # Fetch current positions
-#     positions = kite.positions()
 
-#     # Iterate through each position type ('net', 'day')
-#     for position_type in ['net']:
-#         # Iterate through positions of the current type
-#         for position in positions.get(position_type, []):
-#             # Extract relevant information
-#             tradingsymbol = position['tradingsymbol']
-#             quantity = position['quantity']
-#             average_price = position['average_price']  # Entry price
-
-#             if quantity > 0 and quantity<900:
-#                 # Place a stop loss order at the entry price
-#                 sl_order_id = kite.place_order(variety=kite.VARIETY_REGULAR,
-#                                                exchange=kite.EXCHANGE_NFO,
-#                                                tradingsymbol=tradingsymbol,
-#                                                transaction_type=kite.TRANSACTION_TYPE_SELL,
-#                                                quantity=quantity,
-#                                                product=kite.PRODUCT_MIS,
-#                                                order_type=kite.ORDER_TYPE_SL,
-#                                                trigger_price=average_price+10,
-#                                                price = average_price,
-#                                                tag="StopLoss")
-
-#                 # Print information about the stop loss order
-#                 print(f"Stop loss order placed at entry price for {tradingsymbol} with order id {sl_order_id}")
-#             else:
-#                 print("No position to place stop loss")
-    
     
 def get_stk(condition,kite):
     print(condition)
@@ -356,60 +308,6 @@ async def square_off_all_positions(kite,bot):
 
                 # Now use the obtained group_id in the send_message call
                 await bot.send_message(group_id, message)
-    
-# def fire(condition,kite,bot):
-#     if condition == 1:
-#         direction = "BUY"
-#         option_type = "CE"
-#     elif condition == -1:
-#         direction = "SELL"
-#         option_type = "PE"
-#     exp = get_exp("BANKNIFTY").upper()
-#     stk = get_stk(direction,kite)
-#     contract_name = "BANKNIFTY"
-#     order_info = f"{contract_name}{exp}{stk}{option_type}"
-#     ltp = get_ltp(kite,order_info)
-#     place_order(order_info, quantity,kite)
-#     place_sl_order(order_info,quantity,kite)
-    
-
-    
-    
-# async def fire(condition, kite, bot):
-#     try:
-#         if condition == 1 or condition == -1:
-#             direction = "BUY" if condition == 1 else "SELL"
-#             option_type = "CE" if condition == 1 else "PE"
-#             exp = get_exp("BANKNIFTY").upper()
-#             stk = get_stk(direction, kite)
-#             contract_name = "BANKNIFTY"
-#             order_info = f"{contract_name}{exp}{stk}{option_type}"
-#             ltp = get_ltp(kite,order_info)  # Set the desired quantity
-#             message = f"Direction: {direction}\nOrder Info: {order_info}\nQuantity: {quantity}\nLTP : {ltp}\nDo you want to proceed? (Type /yes to confirm)"
-#             entity = await bot.get_entity(1002140069507)  # Replace 'my channel numeric id' with your channel's numeric id
-#             # entity = await bot.get_entity()
-#             print(entity.id)
-#             group_id = entity.id
-
-#             # Now use the obtained group_id in the send_message call
-#             await bot.send_message(group_id, message)
-#             @bot.on(events.NewMessage(chats=group_id))
-#             async def handle_new_message(event):
-#                 sender = await event.get_sender()
-#                 print(f'Username: {sender.username}, Message: {event.message.text}')
-#             # Wait for user input
-#             #response = await TelegramClient.get_messages(1002140069507, limit=1)
-#             # response = await bot.get_messages(1002140069507, limit=1)
-#             # #response = await bot.get_messages(1002140069507, limit=1)
-#             # print(response)
-#             # if response and len(response) > 0 and (await response[0]).text == '/yes':
-#             # #if response and (await response[0]).text == '/yes':
-#             #     await place_order(order_info, quantity, kite)
-#             #     await place_sl_order(order_info, quantity, kite)
-#             # else:
-#             #     print("User did not confirm. Skipping order placement.")
-#     except telethon.errors.rpcerrorlist.PeerIdInvalidError as e:
-#         print(f"An error occurred: {str(e)}. Check the group_id and bot permissions.")
 
 
 
@@ -514,10 +412,8 @@ async def fire(condition, kite, bot):
                             place_sl_order(order_info, quantity, kite,bot)
                             break
                         else:
-                            # Get the latest open order
-                            latest_order = open_orders[-1]
-                            time.sleep(1)
                             continue
+                        time.sleep(1)    
                             # Add your logic for limit order here
 
                 elif event.message.text == '/yes':
