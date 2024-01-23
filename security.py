@@ -39,12 +39,12 @@ async def place_order(instrument, qty,kite,bot):
     print(instrument)
     mark = get_ltp(kite,instrument)
     if qty >0 and qty < 900 :
-        order_id = kite.place_order(variety=kite.VARIETY_AMO, exchange="NFO",
+        order_id = kite.place_order(variety=kite.VARIETY_REGULAR, exchange="NFO",
                         tradingsymbol=instrument,
                         transaction_type="BUY",
                         quantity=qty,
                         order_type="MARKET",
-                        product="NRML",
+                        product="MIS",
                         validity="DAY",
                         price=0,
                         trigger_price=0)
@@ -82,12 +82,12 @@ async def place_sl_order(instrument, qty,kite,bot):
     mark_price = kite.ltp(f"NFO:{instrument}")[f"NFO:{instrument}"]["last_price"]
     print(instrument)
     if qty >0 and qty< 900 :
-        order_id = kite.place_order(variety=kite.VARIETY_AMO, exchange="NFO",
+        order_id = kite.place_order(variety=kite.VARIETY_REGULAR, exchange="NFO",
                         tradingsymbol=instrument,
                         transaction_type="SELL",
                         quantity=qty,
                         order_type="SL",
-                        product="NRML",
+                        product="MIS",
                         validity="DAY",
                         price=mark_price -80,
                         trigger_price=mark_price - 75)
@@ -131,14 +131,14 @@ async def place_iceberg_limit_order(kite, tradingsymbol, quantity, price,bot):
     mark = get_ltp(kite,tradingsymbol)
     # Calculate the number of legs
     if quantity >0 and quantity < 900 :
-        order_id = kite.place_order(variety=kite.VARIETY_AMO, exchange="NFO",
+        order_id = kite.place_order(variety=kite.VARIETY_REGULAR, exchange="NFO",
                         tradingsymbol=tradingsymbol,
                         transaction_type="BUY",
                         quantity=quantity,
                         order_type="LIMIT",
-                        product="NRML",
+                        product="MIS",
                         validity="DAY",
-                        price=mark)
+                        price=price)
         print("Position entered successfully")
         current_time = datetime.now()
         message = f'exchange_order_id": "{order_id}\nexchange_timestamp": "{current_time}\n Message: status": "COMPLETE"\n{tradingsymbol}\nfilled_quantity": {quantity}\naverage_price": {mark}\n'
@@ -200,7 +200,7 @@ async def ctc(kite,bot):
     orders = kite.orders()
 
     # Filter for open orders
-    open_orders = [order for order in orders if order['status'] == 'OPEN']
+    open_orders = [order for order in orders if order['status'] == 'OPEN' or order['status'] == 'TRIGGER PENDING']
 
     if not open_orders:
         print("No open orders found.")
@@ -224,9 +224,10 @@ async def ctc(kite,bot):
                 parent_order_id=latest_order['parent_order_id'],
                 order_type=latest_order['order_type'],
                 price=average_price,  # Set the limit price to the average price
-                trigger_price=average_price+10,  # Set the trigger price to the average price
+                trigger_price=average_price+1,  # Set the trigger price to the average price
                 validity=kite.VALIDITY_DAY,
-                disclosed_quantity=latest_order['disclosed_quantity']
+                disclosed_quantity=latest_order['disclosed_quantity'],
+                variety = kite.VARIETY_REGULAR
             )
             print(f"Order {latest_order['order_id']} modified successfully.")
             message = f"SL moved to Cost {average_price}, with order ID {order_id}"
@@ -262,7 +263,7 @@ def cancel_orders(kite):
         if order["status"] == "OPEN" or order["status"] == "TRIGGER PENDING" and order["pending_quantity"] > 0:
             order_id = order["order_id"]
             print(order_id)
-            kite.cancel_order(kite.VARIETY_AMO, order_id)
+            kite.cancel_order(kite.VARIETY_REGULAR, order_id)
             print(f"Order {order_id} cancelled")
 
 
@@ -279,12 +280,12 @@ async def square_off_all_positions(kite,bot):
             quantity = position['quantity']
             if quantity > 0 and quantity < 900:
                 # Place a market sell order to square off the position
-                order_id =  kite.place_order(variety=kite.VARIETY_AMO,
+                order_id =  kite.place_order(variety=kite.VARIETY_REGULAR,
                                             exchange=kite.EXCHANGE_NFO,
                                             tradingsymbol=tradingsymbol,
                                             transaction_type=kite.TRANSACTION_TYPE_SELL,
                                             quantity=quantity,
-                                            product=kite.PRODUCT_NRML,
+                                            product=kite.PRODUCT_MIS,
                                             order_type=kite.ORDER_TYPE_MARKET,
                                             tag="SquareOff")
 
@@ -296,18 +297,20 @@ async def square_off_all_positions(kite,bot):
 
                 # Now use the obtained group_id in the send_message call
                 await bot.send_message(group_id, message)
-            else :
-                legs = quantity//900
-                # remaining_qty = quantity % 900
-                order_id = await kite.place_order(variety=kite.VARIETY_ICEBERG,exchange=kite.EXCHANGE_NFO,tradingsymbol=tradingsymbol,transaction_type=kite.TRANSACTION_TYPE_SELL,quantity=quantity,product=kite.MIS,iceberg_legs=legs+1,order_type=kite.ORDER_TYPE_MARKET)
-                print("All orders squared off")
-                message = "All positions squared off"
-                entity = await bot.get_entity(1002140069507)  # Replace 'your_channel_username' with your channel's username
-                print(entity.id)
-                group_id = entity.id
+                break
+#             else :
+#                 legs = quantity//900
+#                 # remaining_qty = quantity % 900
+#                 order_id = await kite.place_order(variety=kite.VARIETY_ICEBERG,exchange=kite.EXCHANGE_NFO,tradingsymbol=tradingsymbol,transaction_type=kite.TRANSACTION_TYPE_SELL,quantity=quantity,product="MIS",iceberg_legs=legs+1,order_type=kite.ORDER_TYPE_MARKET)
+#                 print("All orders squared off")
+#                 message = "All positions squared off"
+#                 entity = await bot.get_entity(1002140069507)  # Replace 'your_channel_username' with your channel's username
+#                 print(entity.id)
+#                 group_id = entity.id
 
-                # Now use the obtained group_id in the send_message call
-                await bot.send_message(group_id, message)
+#                 # Now use the obtained group_id in the send_message call
+#                 await bot.send_message(group_id, message)
+#                 break
 
 
 
@@ -400,16 +403,13 @@ async def fire(condition, kite, bot):
                     order_info = f"{contract_name}{exp}{stkl}{option_type}"
                     print(f"Limit Order - Price: {price}, Quantity: {quantity}, Strike: {strike}")
                     order_id = await place_iceberg_limit_order(kite, order_info, quantity, price,bot)
-                    order = kite.order_history(order_id)
-                    status = order['status']
-                    print("Order Status: ", status)
                     while True:
                         orders = kite.orders()
                         open_orders = [order for order in orders if order['status'] == 'OPEN']
                         if not open_orders:
                             print("No open orders found.")
                             print("Placing SL")
-                            place_sl_order(order_info, quantity, kite,bot)
+                            await place_sl_order(order_info, quantity, kite,bot)
                             break
                         else:
                             continue
