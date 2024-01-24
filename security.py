@@ -11,29 +11,30 @@ import asyncio
 
 
 def get_exp(contract_name):
-    from datetime import datetime, timedelta
-    if contract_name == "BANKNIFTY":
+#     from datetime import datetime, timedelta
+#     if contract_name == "BANKNIFTY":
         
-        current_date = datetime.now()
-        day_of_week = current_date.weekday()
+#         current_date = datetime.now()
+#         day_of_week = current_date.weekday()
 
-        # If it's Tuesday or Wednesday, add 1 or 0 days respectively to get to the next Wednesday
-        if day_of_week in [1, 2]:  # 1 corresponds to Tuesday, 2 corresponds to Wednesday
-            days_until_nearest_day = (2 - day_of_week + 7) % 7
-        else:
-            days_until_nearest_day = (2 - day_of_week + 7) % 7  # 2 corresponds to Wednesday
+#         # If it's Tuesday or Wednesday, add 1 or 0 days respectively to get to the next Wednesday
+#         if day_of_week in [1, 2]:  # 1 corresponds to Tuesday, 2 corresponds to Wednesday
+#             days_until_nearest_day = (2 - day_of_week + 7) % 7
+#         else:
+#             days_until_nearest_day = (2 - day_of_week + 7) % 7  # 2 corresponds to Wednesday
 
-        nearest_day_date = current_date + timedelta(days=days_until_nearest_day)
-        next_week_date = current_date + timedelta(days=7)
+#         nearest_day_date = current_date + timedelta(days=days_until_nearest_day)
+#         next_week_date = current_date + timedelta(days=7)
 
-        # Check if the selected expiry is the last week of the month
-        if nearest_day_date.month != next_week_date.month or (nearest_day_date.day + 7) > next_week_date.day:
-            # If it is, return in the format "YYMON"
-            return nearest_day_date.strftime('%y%b').upper()
-        else:
-            # Regular case
-            month = nearest_day_date.strftime('%m').lstrip('0')  # Remove leading zero for month
-            return nearest_day_date.strftime('%y{0}%d').format(month) + nearest_day_date.strftime('%y%m%d')[6:]
+#         # Check if the selected expiry is the last week of the month
+#         if nearest_day_date.month != next_week_date.month or (nearest_day_date.day + 7) > next_week_date.day:
+#             # If it is, return in the format "YYMON"
+#             return nearest_day_date.strftime('%y%b').upper()
+#         else:
+#             # Regular case
+#             month = nearest_day_date.strftime('%m').lstrip('0')  # Remove leading zero for month
+#             return nearest_day_date.strftime('%y{0}%d').format(month) + nearest_day_date.strftime('%y%m%d')[6:]
+    return '24131'
 
 async def place_order(instrument, qty,kite,bot):
     print(instrument)
@@ -141,7 +142,7 @@ async def place_iceberg_limit_order(kite, tradingsymbol, quantity, price,bot):
                         price=price)
         print("Position entered successfully")
         current_time = datetime.now()
-        message = f'exchange_order_id": "{order_id}\nexchange_timestamp": "{current_time}\n Message: status": "COMPLETE"\n{tradingsymbol}\nfilled_quantity": {quantity}\naverage_price": {mark}\n'
+        message = f'Message: status": "COMPLETE"\nexchange_order_id": "{order_id}\nexchange_timestamp": "{current_time}\n \n{tradingsymbol}\nfilled_quantity": {quantity}\naverage_price": {mark}\n'
         #message = f"Order filled with {order_id} for {tradingsymbol} at {mark} Rs."
         entity = await bot.get_entity(1002140069507)  # Replace 'your_channel_username' with your channel's username
         print(entity.id)
@@ -334,13 +335,16 @@ async def calculate_and_send_pnl(kite, group_id, bot):
 
                 if has_open_position :
                     pnl = position['m2m']
+                    avg = position['average_price']
+                    ltp = get_ltp(kite,trading_symbol)
+                    pnl = (ltp - avg)*quantity
                     print(f"PnL for {trading_symbol}: ", pnl)
                     await bot.send_message(group_id, f"PnL for {trading_symbol}: {pnl}")
                 else:
                     print("No open positions")
                     break
 
-            await asyncio.sleep(60*5)  # Adjust the sleep duration as needed
+            await asyncio.sleep(30)  # Adjust the sleep duration as needed
 
         except Exception as e:
             print(f"An error occurred while calculating P&L: {e}")
@@ -410,6 +414,7 @@ async def fire(condition, kite, bot):
                             print("No open orders found.")
                             print("Placing SL")
                             await place_sl_order(order_info, quantity, kite,bot)
+                            await calculate_and_send_pnl(kite, group_id, bot)
                             break
                         else:
                             continue
