@@ -83,6 +83,9 @@ async def handle_new_message(event):
     elif content == '/CTC' :
         print("Cost to cost")
         await security.ctc(kite,bot)
+    elif content == '/PRF-T' :
+        print("Take profit level initiated")
+        await security.prft(kite,bot)    
     # Call the regex_parser function with the message content
     await regex_parser(content)
 
