@@ -11,30 +11,30 @@ import asyncio
 
 
 def get_exp(contract_name):
-#     from datetime import datetime, timedelta
-#     if contract_name == "BANKNIFTY":
+    from datetime import datetime, timedelta
+    if contract_name == "BANKNIFTY":
         
-#         current_date = datetime.now()
-#         day_of_week = current_date.weekday()
+        current_date = datetime.now()
+        day_of_week = current_date.weekday()
 
-#         # If it's Tuesday or Wednesday, add 1 or 0 days respectively to get to the next Wednesday
-#         if day_of_week in [1, 2]:  # 1 corresponds to Tuesday, 2 corresponds to Wednesday
-#             days_until_nearest_day = (2 - day_of_week + 7) % 7
-#         else:
-#             days_until_nearest_day = (2 - day_of_week + 7) % 7  # 2 corresponds to Wednesday
+        # If it's Tuesday or Wednesday, add 1 or 0 days respectively to get to the next Wednesday
+        if day_of_week in [1, 2]:  # 1 corresponds to Tuesday, 2 corresponds to Wednesday
+            days_until_nearest_day = (2 - day_of_week + 7) % 7
+        else:
+            days_until_nearest_day = (2 - day_of_week + 7) % 7  # 2 corresponds to Wednesday
 
-#         nearest_day_date = current_date + timedelta(days=days_until_nearest_day)
-#         next_week_date = current_date + timedelta(days=7)
+        nearest_day_date = current_date + timedelta(days=days_until_nearest_day)
+        next_week_date = current_date + timedelta(days=7)
 
-#         # Check if the selected expiry is the last week of the month
-#         if nearest_day_date.month != next_week_date.month or (nearest_day_date.day + 7) > next_week_date.day:
-#             # If it is, return in the format "YYMON"
-#             return nearest_day_date.strftime('%y%b').upper()
-#         else:
-#             # Regular case
-#             month = nearest_day_date.strftime('%m').lstrip('0')  # Remove leading zero for month
-#             return nearest_day_date.strftime('%y{0}%d').format(month) + nearest_day_date.strftime('%y%m%d')[6:]
-    return '24131'
+        # Check if the selected expiry is the last week of the month
+        if nearest_day_date.month != next_week_date.month or (nearest_day_date.day + 7) > next_week_date.day:
+            # If it is the 5th Wednesday, return in the format "YYMMDD"
+            #return nearest_day_date.strftime('%y%m%d')
+            month = nearest_day_date.strftime('%m').lstrip('0')  
+            return nearest_day_date.strftime('%y{0}%d').format(month) + nearest_day_date.strftime('%y%m%d')[6:]
+        else:
+            # If it is the 4th Wednesday, return in the format "YYMON"
+            return nearest_day_date.strftime('%y%b').upper()
 
 async def place_order(instrument, qty,kite,bot):
     print(instrument)
@@ -52,7 +52,7 @@ async def place_order(instrument, qty,kite,bot):
         print("Position entered successfully")
         #message = f"Position entered successfully {instrument} at {mark} Rs. with order id {order_id}"
         current_time = datetime.now()
-        message = f'exchange_order_id": "{order_id}\nexchange_timestamp": "{current_time}\n Message: status": "COMPLETE"\n{instrument}\nfilled_quantity": {qty}\naverage_price": {mark}\n'
+        message = f'Message: status: "COMPLETE"\n {instrument}\nfilled_quantity": {qty}\naverage_price": {mark}\nexchange_order_id": "{order_id}\nexchange_timestamp": "{current_time}"'
 
         entity = await bot.get_entity(1002140069507)  # Replace 'your_channel_username' with your channel's username
         print(entity.id)
@@ -244,9 +244,9 @@ async def ctc(kite,bot):
 
     
 def get_stk(condition,kite):
-    print(condition)
-    banknifty_ltp = kite.ltp("NSE:NIFTY BANK")["NSE:NIFTY BANK"]["last_price"]
-    print(banknifty_ltp)
+    ins = "BANKNIFTY"
+    instrument = ins + get_current_year_month()
+    banknifty_ltp = kite.ltp(f"NFO:{instrument}")[f"NFO:{instrument}"]["last_price"]
     strike_price = round(banknifty_ltp / 100) * 100
     print(f"{strike_price} is strike price")
 
@@ -291,7 +291,7 @@ async def square_off_all_positions(kite,bot):
                                             tag="SquareOff")
 
                 # Print information about the square off order
-                message = f"Square off order placed for {tradingsymbol} with order id {order_id}"
+                message = f"status : 'COMPLETE'\nSquare off order placed for {tradingsymbol} with order id {order_id}"
                 entity = await bot.get_entity(1002140069507)  # Replace 'your_channel_username' with your channel's username
                 print(entity.id)
                 group_id = entity.id
@@ -322,6 +322,7 @@ async def calculate_and_send_pnl(kite, group_id, bot):
             print(pos)
             positions = kite.positions()['net']
             orders = kite.orders()
+            has_open_position_flag = False
 
             for position in positions:
                 trading_symbol = position['tradingsymbol']
@@ -330,25 +331,39 @@ async def calculate_and_send_pnl(kite, group_id, bot):
                 # Check if there is an open position
                 has_open_position = quantity != 0
 
-                # Check if the SL order is hit
-                
-
                 if has_open_position :
+                    has_open_position_flag = True
                     pnl = position['m2m']
                     avg = position['average_price']
                     ltp = get_ltp(kite,trading_symbol)
-                    pnl = (ltp - avg)*quantity
+                    pnl = round((ltp - avg) * quantity, 2)
                     print(f"PnL for {trading_symbol}: ", pnl)
-                    await bot.send_message(group_id, f"PnL for {trading_symbol}: {pnl}")
-                else:
-                    print("No open positions")
-                    break
+                    await bot.send_message(group_id, f"Entry for {trading_symbol}: {avg}PnL \nLTP for {trading_symbol} : {ltp}   \n PNL :{pnl} ₹")
+
+            if has_open_position_flag == False :
+                # pnl = position['m2m']
+                # avg = position['average_price']
+                # ltp = get_ltp(kite,trading_symbol)
+                # pnl = round((ltp - avg) * quantity, 2)
+                positions = kite.positions()['net']
+    
+    # Assuming the latest position is the last one in the list
+                latest_position = positions[-1]
+                
+                # Calculate PnL
+                pnl =  latest_position['sell_m2m'] - latest_position['buy_m2m']
+                print(f"Final PnL for {trading_symbol}: ", pnl)
+                await bot.send_message(group_id, f"Final PnL for {trading_symbol}: {pnl} ₹")
+                print("No open positions")
+                break
+
 
             await asyncio.sleep(30)  # Adjust the sleep duration as needed
 
         except Exception as e:
             print(f"An error occurred while calculating P&L: {e}")
             # Add appropriate error handling logic here
+
 
 async def fire(condition, kite, bot):
     try:
@@ -362,7 +377,7 @@ async def fire(condition, kite, bot):
             ltp = get_ltp(kite, order_info)
             quantity = 15  # Set the desired quantity (you need to define the quantity here)
             margin = quantity * ltp
-            message = f"Direction: {direction}\nOrder Info: {order_info}\nQuantity: {quantity}\nLTP : {ltp}\nDo you want to proceed? (Type /yes to confirm),\n{margin} is margin"
+            message = f"Direction: {direction}\nOrder Info: {order_info}\nQuantity: {quantity}\nLTP : {ltp}\nDo you want to proceed? (Type /yes to confirm),\n{margin} ₹ is margin\n other options are MKT/QTY/STRIKE \n LMT/PRICE/QTY/STRIKE"
             entity = await bot.get_entity(1002140069507)  # Replace 'your_channel_username' with your channel's username
             print(entity.id)
             group_id = entity.id
@@ -417,8 +432,9 @@ async def fire(condition, kite, bot):
                             await calculate_and_send_pnl(kite, group_id, bot)
                             break
                         else:
+                            time.sleep(1) 
                             continue
-                        time.sleep(1)    
+                           
                             # Add your logic for limit order here
 
                 elif event.message.text == '/yes':
@@ -436,7 +452,49 @@ async def fire(condition, kite, bot):
     except Exception as e:
         print(f"An error occurred: {e}")
 
+def check_latest_position(kite):
+    # Fetch the positions.
+    positions = kite.positions()['net']
+    
+    # Check if there are any positions.
+    if not positions:
+        return "No positions found."
+    
+    # Get the latest position.
+    latest_position = positions[-1]
+    
+    # Check if the quantity is positive (buy) or negative (sell).
+    if latest_position['quantity'] > 0:
+        return "BUY"
+    elif latest_position['quantity'] < 0:
+        return "SELL"
+    else:
+        return None
 
+async def prft(kite,bot) :
+    latest_pos = check_latest_position(kite)
+    ins = "BANKNIFTY"
+    instrument = ins + get_current_year_month()
+    pt = kite.ltp(f"NFO:{instrument}")[f"NFO:{instrument}"]["last_price"]
+    if latest_pos == "BUY":
+        while True:
+            ltp = kite.ltp(f"NFO:{instrument}")[f"NFO:{instrument}"]["last_price"]
+            if ltp <= pt :
+                await square_off_all_positions(kite,bot)
+                break
+    elif latest_pos == "SELL":
+        while True:
+            ltp = kite.ltp(f"NFO:{instrument}")[f"NFO:{instrument}"]["last_price"]
+            if ltp >= pt :
+                await square_off_all_positions(kite,bot)
+                break       
+
+
+
+def get_current_year_month():
+    import datetime
+    now = datetime.datetime.now()
+    return now.strftime("%y%b").upper() + 'FUT'
 # print(get_exp("BANKNIFTY"))
 def get_ltp(kite,instrument):
     ltp = kite.ltp(f"NFO:{instrument}")[f"NFO:{instrument}"]["last_price"]
